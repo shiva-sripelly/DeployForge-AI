@@ -57,14 +57,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.middleware("http")(request_context_middleware)
     # Added last so it is outermost and error responses also carry CORS headers.
     app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-        expose_headers=["X-Request-ID"],
-        max_age=600,
-    )
-
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Request-ID",
+    ],
+    expose_headers=["X-Request-ID"],
+    max_age=600,
+)
     app.include_router(build_api_router(settings), prefix=settings.api_v1_prefix)
     return app

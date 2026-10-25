@@ -48,6 +48,13 @@ export function assertProductionApiBaseUrl({ appMode, apiBaseUrl }: BuildTarget)
   if (LOCAL_HOSTNAME.test(url.hostname)) {
     throw new Error(`VITE_API_BASE_URL must not point at a local address in production builds.`);
   }
+  // Catch a bare host (requests would hit /health/... and 404) or a duplicated version path.
+  if (url.pathname.replace(/\/+$/, "") !== DEFAULT_API_BASE_URL) {
+    throw new Error(
+      `VITE_API_BASE_URL must end with exactly "${DEFAULT_API_BASE_URL}", e.g. ` +
+        `"${url.origin}${DEFAULT_API_BASE_URL}" (got "${apiBaseUrl}").`,
+    );
+  }
 }
 
 export function contentSecurityPolicy(apiBaseUrl: string): string {

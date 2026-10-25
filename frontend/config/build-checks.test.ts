@@ -30,6 +30,26 @@ describe("assertProductionApiBaseUrl", () => {
     ).not.toThrow();
   });
 
+  it("accepts a trailing slash after the version path", () => {
+    expect(() =>
+      assertProductionApiBaseUrl({
+        appMode: "demo",
+        apiBaseUrl: "https://deployforge-api-jeuo.onrender.com/api/v1/",
+      }),
+    ).not.toThrow();
+  });
+
+  it.each([
+    "https://deployforge-api-jeuo.onrender.com",
+    "https://deployforge-api-jeuo.onrender.com/",
+    "https://deployforge-api-jeuo.onrender.com/api/v1/api/v1",
+    "https://deployforge-api-jeuo.onrender.com/api",
+  ])("rejects a missing or duplicated version path: %s", (apiBaseUrl) => {
+    expect(() => assertProductionApiBaseUrl({ appMode: "demo", apiBaseUrl })).toThrow(
+      'must end with exactly "/api/v1", e.g. "https://deployforge-api-jeuo.onrender.com/api/v1"',
+    );
+  });
+
   it("requires an absolute API URL for the public demo", () => {
     expect(() => assertProductionApiBaseUrl({ appMode: "demo", apiBaseUrl: "/api/v1" })).toThrow(
       /absolute https/,
