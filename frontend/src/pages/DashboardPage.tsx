@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/Table";
+import { DEMO_DISABLED_TITLE } from "@/demo/demo-api";
 import { CreateOrganizationDialog } from "@/features/organizations/CreateOrganizationDialog";
 import { formatDate, formatNumber, formatRelativeTime, titleCase } from "@/lib/format";
 import { useOrganizationContext } from "@/providers/OrganizationProvider";
@@ -201,7 +202,8 @@ function PlatformStatusCard() {
 }
 
 function RecentActivityCard({ organization }: { organization: Organization }) {
-  const canView = isManager(organization.role);
+  // The demo shows its synthetic audit trail to every visitor.
+  const canView = __DEMO_MODE__ || isManager(organization.role);
   const audit = useAuditLogs(organization.id, canView);
 
   return (
@@ -296,7 +298,12 @@ export function DashboardPage() {
             title="Create your first customer organization"
             description="Organizations are isolated tenants. Workspaces, members and the audit trail all belong to one."
             action={
-              <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)}>
+              <Button
+                icon={<Plus className="size-4" aria-hidden />}
+                onClick={() => setCreating(true)}
+                disabled={__DEMO_MODE__}
+                title={__DEMO_MODE__ ? DEMO_DISABLED_TITLE : undefined}
+              >
                 New organization
               </Button>
             }
@@ -317,7 +324,13 @@ export function DashboardPage() {
           </>
         }
         actions={
-          <Button variant="secondary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)}>
+          <Button
+            variant="secondary"
+            icon={<Plus className="size-4" aria-hidden />}
+            onClick={() => setCreating(true)}
+            disabled={__DEMO_MODE__}
+            title={__DEMO_MODE__ ? DEMO_DISABLED_TITLE : undefined}
+          >
             New organization
           </Button>
         }

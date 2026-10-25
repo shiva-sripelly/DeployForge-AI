@@ -124,3 +124,22 @@ roles.
   Form fields wire up `aria-invalid` and `aria-describedby`, the API status indicator is a live
   region, there is a skip link, and the off-canvas navigation leaves the tab order when it is
   closed.
+
+## Deployment topology (Phase 1.5)
+
+| Environment | Frontend | API | Database | Authentication |
+| --- | --- | --- | --- | --- |
+| Local (Docker Compose) | nginx, full console (`npm run build`) | Docker, same origin via `/api` proxy | PostgreSQL container | Development tokens, loopback only |
+| Public (cloud) | Vercel, read-only demo (`npm run build:demo`) | Render (Docker, `PORT`-aware) | Supabase via session pooler, TLS required | None (dev auth refused in production) |
+
+- **Compile-time demo flag.** `__DEMO_MODE__` is replaced by Vite at build time. Code guarded by
+  it is removed from the other build: the demo has no sign-in or token code, and the full
+  console has no synthetic data. `scripts/check-bundle.mjs` verifies this.
+- **Fail-safe configuration.** `python -m app.core.config` runs before migrations in the
+  container entrypoint. Errors name the variable but never echo values, because pydantic's
+  default messages can include secret inputs.
+- **Defense in depth on hosted PostgreSQL.** Production requires TLS. Row-level security on
+  every table blocks provider REST APIs that use public keys. The API connects as the table
+  owner, so the existing service-layer authorization is unchanged.
+
+Setup and operations: [deployment/CLOUD_DEPLOYMENT.md](deployment/CLOUD_DEPLOYMENT.md).

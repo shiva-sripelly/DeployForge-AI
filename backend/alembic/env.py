@@ -6,6 +6,7 @@ from alembic import context
 from app import models  # noqa: F401  (registers tables on Base.metadata)
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.session import create_database_engine
 
 config = context.config
 if config.config_file_name is not None:
@@ -34,7 +35,11 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     connectable = config.attributes.get("connection")
     if connectable is None:
-        engine = create_engine(_database_url(), poolclass=pool.NullPool)
+        if "database_url" in config.attributes:
+            engine = create_engine(config.attributes["database_url"], poolclass=pool.NullPool)
+        else:
+            # Same TLS, timeout and pooler settings as the application itself.
+            engine = create_database_engine(get_settings(), null_pool=True)
         with engine.connect() as connection:
             _run(connection)
         engine.dispose()

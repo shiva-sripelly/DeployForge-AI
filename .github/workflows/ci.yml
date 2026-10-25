@@ -1,5 +1,8 @@
 name: CI
 
+# Runs on every pull request and on main. Vercel and Render deploy production
+# only from main, and main only accepts pull requests whose checks pass
+# (configure branch protection: docs/deployment/CLOUD_DEPLOYMENT.md).
 on:
   push:
     branches: [main]
@@ -13,6 +16,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  security-config:
+    name: Security configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml==6.0.3
+      - name: Secrets, environment files and deployment config
+        run: python scripts/ci/check_security_config.py
+
   backend:
     name: Backend (lint, migrations, tests)
     runs-on: ubuntu-latest
@@ -54,7 +69,7 @@ jobs:
       - run: pytest --cov=app --cov-report=term-missing
 
   frontend:
-    name: Frontend (lint, types, tests, build)
+    name: Frontend (lint, types, tests, builds)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -69,11 +84,44 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - name: Tests (full console and public demo projects)
+        run: npm test
+      - name: Production build (Docker / self-hosted console)
+        run: npm run build && npm run check:bundle
+      - name: Public demo build (Vercel) contains no development sign-in code
+        env:
+          VITE_API_BASE_URL: https://deployforge-api.example.invalid/api/v1
+        run: npm run build:demo && npm run check:bundle -- --public
+
+  container-smoke:
+    name: Backend container (Render runtime smoke test)
+    runs-on: ubuntu-latest
+    needs: [backend]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: deployforge
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: deployforge
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U deployforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t deployforge-backend:ci backend
+      - name: Fail-safe config, PORT binding, auth boundary
+        env:
+          IMAGE: deployforge-backend:ci
+          DOCKER_NETWORK: host
+          SMOKE_DATABASE_URL: postgresql+psycopg://deployforge:ci_only_password@127.0.0.1:5432/deployforge
+        run: bash scripts/ci/container_smoke_test.sh
 
   docker:
-    name: Docker images build
+    name: Docker Compose images build
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     steps:

@@ -70,16 +70,20 @@ export function SettingsPage() {
           <CardHeader
             title="Account"
             actions={
-              <Button variant="secondary" size="sm" onClick={signOut} icon={<LogOut className="size-3.5" aria-hidden />}>
-                Sign out
-              </Button>
+              !__DEMO_MODE__ && (
+                <Button variant="secondary" size="sm" onClick={signOut} icon={<LogOut className="size-3.5" aria-hidden />}>
+                  Sign out
+                </Button>
+              )
             }
           />
           <dl className="divide-y divide-border px-5 pb-2">
             <Row label="Name">{user?.full_name}</Row>
             <Row label="Email">{user?.email}</Row>
             <Row label="Last sign-in">{user?.last_login_at ? formatDateTime(user.last_login_at) : "—"}</Row>
-            <Row label="Session">Stored for this browser tab only</Row>
+            <Row label="Session">
+              {__DEMO_MODE__ ? "Anonymous demo visitor (no account, no token)" : "Stored for this browser tab only"}
+            </Row>
           </dl>
         </Card>
 
@@ -91,7 +95,11 @@ export function SettingsPage() {
             </Row>
             <Row label="API version">{liveness.data?.version ?? "—"}</Row>
             <Row label="Environment">{liveness.data ? titleCase(liveness.data.environment) : "—"}</Row>
-            <Row label="Authentication">Development tokens (SSO arrives in Phase 2)</Row>
+            <Row label="Authentication">
+              {__DEMO_MODE__
+                ? "Disabled in the public demo (SSO arrives in Phase 2)"
+                : "Development tokens (SSO arrives in Phase 2)"}
+            </Row>
           </dl>
         </Card>
       </div>

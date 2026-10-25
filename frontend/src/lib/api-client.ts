@@ -95,8 +95,9 @@ export const apiClient = axios.create({
   headers: { Accept: "application/json" },
 });
 
+// The public demo never holds a token, so token handling is compiled out of its bundle.
 apiClient.interceptors.request.use((config) => {
-  const token = accessTokenStore.get();
+  const token = __DEMO_MODE__ ? null : accessTokenStore.get();
   if (token) config.headers.set("Authorization", `Bearer ${token}`);
   return config;
 });
@@ -105,7 +106,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     const apiError = toApiError(error);
-    if (apiError.status === 401 && accessTokenStore.get()) {
+    if (!__DEMO_MODE__ && apiError.status === 401 && accessTokenStore.get()) {
       accessTokenStore.clear();
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     }

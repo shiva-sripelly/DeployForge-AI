@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/Table";
+import { DEMO_DISABLED_TITLE } from "@/demo/demo-api";
 import { CreateOrganizationDialog } from "@/features/organizations/CreateOrganizationDialog";
 import { formatDate } from "@/lib/format";
 import { useOrganizationContext } from "@/providers/OrganizationProvider";
@@ -23,7 +24,12 @@ export function CustomersPage() {
         title="Customers"
         description="Each customer is an isolated organization (tenant). Its workspaces, members and audit history never mix with another customer's."
         actions={
-          <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)}>
+          <Button
+            icon={<Plus className="size-4" aria-hidden />}
+            onClick={() => setCreating(true)}
+            disabled={__DEMO_MODE__}
+            title={__DEMO_MODE__ ? DEMO_DISABLED_TITLE : undefined}
+          >
             New organization
           </Button>
         }

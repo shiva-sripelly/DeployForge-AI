@@ -208,6 +208,7 @@ def test_safe_production_config_disables_docs(db_session: Session) -> None:
         dev_auth_enabled=False,
         jwt_secret_key=PRODUCTION_SECRET,
         cors_origins="https://app.deployforge.ai",
+        database_ssl_mode="require",
     )
     assert settings.cors_origins == ["https://app.deployforge.ai"]
 

@@ -2,6 +2,7 @@ import { Building2, LogOut, Menu } from "lucide-react";
 
 import { ApiStatusIndicator } from "@/components/layout/ApiStatusIndicator";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { Badge } from "@/components/ui/Badge";
 import { useAuth } from "@/providers/AuthProvider";
 import { useOrganizationContext } from "@/providers/OrganizationProvider";
 
@@ -80,15 +81,19 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
               <p className="text-sm font-medium text-foreground">{user.full_name}</p>
               <p className="text-xs text-subtle">{user.email}</p>
             </div>
-            <button
-              type="button"
-              onClick={signOut}
-              className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground"
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut className="size-4" aria-hidden />
-            </button>
+            {__DEMO_MODE__ ? (
+              <Badge tone="primary">Read-only</Badge>
+            ) : (
+              <button
+                type="button"
+                onClick={signOut}
+                className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut className="size-4" aria-hidden />
+              </button>
+            )}
           </div>
         )}
       </div>
