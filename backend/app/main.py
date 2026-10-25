@@ -32,6 +32,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "environment": settings.environment,
                 "version": settings.app_version,
                 "dev_auth_enabled": settings.dev_auth_enabled,
+                "cors_origins": settings.cors_origins,
+                "database_ssl_mode": settings.effective_database_ssl_mode,
             },
         )
         if settings.dev_auth_enabled:

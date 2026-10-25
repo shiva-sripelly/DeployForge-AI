@@ -21,7 +21,9 @@ export function useReadiness(refetchInterval: number | false = 30_000) {
     queryKey: queryKeys.readiness,
     queryFn: api.getReadiness,
     refetchInterval,
-    retry: false,
+    // The hosted API may be cold-starting (free tiers sleep when idle): keep
+    // trying for about a minute before reporting it offline.
+    retry: __DEMO_MODE__ ? 3 : false,
   });
 }
 

@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+# Non-secret build mode file for the public demo (see frontend/.env.demo).
+!frontend/.env.demo
 
 # Python
 __pycache__/

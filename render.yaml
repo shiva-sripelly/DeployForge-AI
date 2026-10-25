@@ -1,0 +1,57 @@
+# Render Blueprint for the DeployForge AI API.
+# Docs: docs/deployment/CLOUD_DEPLOYMENT.md
+#
+# Secrets are declared with `sync: false`: Render prompts for them when the
+# Blueprint is first applied, and they are never stored in this repository.
+
+services:
+  - type: web
+    name: deployforge-api
+    runtime: docker
+    plan: free
+    # Keep close to the Supabase project region (virginia <-> Supabase us-east-1).
+    region: virginia
+    branch: main
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    # Deploy main only after GitHub checks (CI) pass on the commit.
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/v1/health/ready
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_FORMAT
+        value: json
+      # Security: development token issuance is rejected by the API in production.
+      - key: DEV_AUTH_ENABLED
+        value: "false"
+      - key: SEED_DEV_DATA
+        value: "false"
+      # Single free instance: migrations run at container start (idempotent, transactional).
+      - key: RUN_MIGRATIONS
+        value: "true"
+      # Render's proxy is the only route to the container, so trust its X-Forwarded-For.
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      # Supabase session pooler (IPv4) with TLS; small pool for free-tier limits.
+      - key: DATABASE_SSL_MODE
+        value: require
+      - key: DATABASE_POOL_SIZE
+        value: "3"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "2"
+      - key: DATABASE_POOL_RECYCLE_SECONDS
+        value: "300"
+      - key: DATABASE_CONNECT_TIMEOUT_SECONDS
+        value: "10"
+      # --- Secrets / deployment-specific values (entered in the Render dashboard) ---
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

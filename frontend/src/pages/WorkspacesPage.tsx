@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/Table";
+import { DEMO_DISABLED_TITLE } from "@/demo/demo-api";
 import { CreateWorkspaceDialog } from "@/features/workspaces/CreateWorkspaceDialog";
 import { formatDate } from "@/lib/format";
 import { useOrganizationContext } from "@/providers/OrganizationProvider";
@@ -41,7 +42,7 @@ export function WorkspacesPage() {
     );
   }
 
-  const canCreate = isManager(activeOrganization?.role);
+  const canCreate = !__DEMO_MODE__ && isManager(activeOrganization?.role);
   const loading = organizationsLoading || workspaces.isPending;
 
   return (
@@ -62,7 +63,13 @@ export function WorkspacesPage() {
             icon={<Plus className="size-4" aria-hidden />}
             onClick={() => setCreating(true)}
             disabled={!canCreate}
-            title={canCreate ? undefined : "Requires the owner or admin role"}
+            title={
+              canCreate
+                ? undefined
+                : __DEMO_MODE__
+                  ? DEMO_DISABLED_TITLE
+                  : "Requires the owner or admin role"
+            }
           >
             New workspace
           </Button>

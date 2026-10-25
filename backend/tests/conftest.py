@@ -44,6 +44,24 @@ def make_settings(**overrides: Any) -> Settings:
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]
 
 
+PRODUCTION_JWT_SECRET = "prod-test-" + "Zx9Qw7Lm4" * 6
+PRODUCTION_ORIGIN = "https://deployforge-ai.vercel.app"
+
+
+def make_production_settings(**overrides: Any) -> Settings:
+    """Settings that satisfy every production safety check."""
+    values: dict[str, Any] = {
+        "environment": "production",
+        "dev_auth_enabled": False,
+        "jwt_secret_key": PRODUCTION_JWT_SECRET,
+        "cors_origins": PRODUCTION_ORIGIN,
+        "database_ssl_mode": "require",
+        "log_format": "json",
+    }
+    values.update(overrides)
+    return make_settings(**values)
+
+
 def alembic_config() -> Config:
     return Config(str(BACKEND_DIR / "alembic.ini"))
 

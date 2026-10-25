@@ -19,6 +19,13 @@ export default defineConfig([
       ecmaVersion: 2022,
       globals: globals.browser,
     },
+    rules: {
+      // Allow intentionally unused, underscore-prefixed parameters and rest siblings.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
+      ],
+    },
   },
   {
     // Test utilities and providers export hooks alongside components.

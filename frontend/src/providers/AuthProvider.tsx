@@ -9,7 +9,7 @@ import { accessTokenStore } from "@/lib/storage";
 
 export type AuthStatus = "anonymous" | "loading" | "authenticated" | "error";
 
-interface AuthContextValue {
+export interface AuthContextValue {
   status: AuthStatus;
   user: User | null;
   error: unknown;
@@ -18,7 +18,8 @@ interface AuthContextValue {
   retry: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+/** Exported so the public demo can supply a token-free identity (see DemoAuthProvider). */
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
