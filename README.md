@@ -1,98 +1,278 @@
+<div align="center">
+
 # DeployForge AI
 
-> Enterprise AI-powered Forward Deployment Platform for intelligent solution architecture, multi-tenant SaaS, AI agents, workflow automation, system integrations, and production operations.
+**An enterprise platform for forward-deployed engineers: turn customer requirements into secure, deployable AI-powered solutions.**
 
-DeployForge AI is an enterprise platform that helps forward-deployed engineers turn customer
-requirements into secure, deployable AI-powered solutions.
+[![CI](https://github.com/shiva-sripelly/DeployForge-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/shiva-sripelly/DeployForge-AI/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 
-This repository contains **Phase 1: the enterprise application foundation**. It includes
-multi-tenant organizations and workspaces, tenant-aware authorization, an audit trail, a
-production-style API, and a React console wired to live data. The AI capabilities
-(Solution Architect, Agent Studio, workflow engine) are deliberately **not** implemented yet;
-their pages in the console describe what is planned and show no metrics.
+[**Live demo**](https://deploy-forge-ai.vercel.app) ·
+[**API health**](https://deployforge-api-jeuo.onrender.com/api/v1/health/ready) ·
+[Architecture](docs/architecture.md) ·
+[Deployment guide](docs/deployment/CLOUD_DEPLOYMENT.md)
 
----
-
-## Contents
-
-- [What Phase 1 delivers](#what-phase-1-delivers)
-- [Architecture](#architecture)
-- [Technology stack](#technology-stack)
-- [Quick start (Docker)](#quick-start-docker)
-- [Local development without Docker](#local-development-without-docker)
-- [Configuration](#configuration)
-- [Database migrations](#database-migrations)
-- [Testing](#testing)
-- [Cloud deployment and public demo](#cloud-deployment-and-public-demo)
-- [API reference](#api-reference)
-- [Security model](#security-model)
-- [Known limitations](#known-limitations)
-- [Roadmap](#roadmap)
+</div>
 
 ---
 
-## What Phase 1 delivers
+## Overview
 
-| Area | Implemented |
+DeployForge AI is being built in phases into a platform where engineering teams manage
+customer engagements end to end: from requirements, through solution design and AI agents, to
+production operations.
+
+The project has completed **Phase 1 (enterprise application foundation)** and **Phase 1.5
+(public cloud deployment and CI/CD)**:
+
+- A multi-tenant FastAPI backend with role-based, tenant-aware authorization, an audit trail,
+  PostgreSQL with Alembic migrations, and structured logging.
+- A React + TypeScript console with a light/dark design system, connected to the API.
+- A production deployment on Vercel, Render and Supabase, with a security-gated CI pipeline.
+
+> **Scope note.** The AI capabilities (Solution Architect, Agent Studio, workflow engine,
+> integrations, deployments and incidents) are **planned, not implemented**. Their pages in the
+> console describe the roadmap and deliberately show no data. See the [Roadmap](#development-roadmap).
+
+### Key features
+
+| Area | What is implemented |
 | --- | --- |
-| **Tenancy** | Organizations (tenants), workspaces, organization and workspace memberships with roles |
-| **Authorization** | JWT bearer authentication on every tenant endpoint; role checks; cross-tenant access returns 404 |
-| **Audit trail** | Organization and workspace creation and token issuance are recorded atomically with the change |
-| **API** | Versioned REST API (`/api/v1`), health and readiness probes, consistent error envelope, request IDs |
-| **Console** | Responsive React UI: dashboard, customers, workspaces (list, create, detail), monitoring, settings, light/dark themes |
-| **Operations** | Docker Compose stack, Alembic migrations, structured JSON logging, GitHub Actions CI |
+| **Multi-tenancy** | Organizations (tenants) and workspaces, with organization roles (owner, admin, member, viewer) and workspace roles (admin, editor, viewer) |
+| **Authorization** | JWT bearer authentication on every tenant endpoint and role checks in the service layer. Cross-tenant access returns `404`, so other tenants' IDs cannot be probed. |
+| **Database-level isolation** | Composite foreign keys keep workspace memberships within one organization. Row-level security is enabled on every table. |
+| **Audit trail** | Organization and workspace creation and token issuance are written in the same transaction as the change |
+| **Production API** | Versioned REST (`/api/v1`), liveness and readiness probes, a consistent error envelope, request IDs and pagination |
+| **Enterprise console** | Responsive dashboard, customers, workspaces (list, create, detail), monitoring and settings; light, dark and system themes |
+| **Public demo mode** | A read-only build with synthetic data. Development sign-in code is removed at compile time. |
+| **Operations** | Docker Compose, structured JSON logs, fail-safe production configuration, a five-job CI pipeline |
 
 In the console, **Customers** maps to organizations: each customer is an isolated tenant, and
 each engagement or solution for that customer is a **workspace**.
 
-## Architecture
+---
 
-```
-┌────────────────────┐      /api/*       ┌──────────────────────┐      SQL      ┌──────────────┐
-│ React SPA (nginx)  │ ────────────────▶ │ FastAPI (uvicorn)    │ ────────────▶ │ PostgreSQL   │
-│ Vite · TanStack Q. │   same origin     │ services · authz     │  SQLAlchemy   │ 17           │
-└────────────────────┘                   └──────────────────────┘               └──────────────┘
-```
+## Live deployment
 
-A modular monolith, by design: one API service, one database, and clear internal layers.
+| Component | URL | Hosting |
+| --- | --- | --- |
+| **Web application** (public demo) | <https://deploy-forge-ai.vercel.app> | Vercel |
+| **Backend API** | <https://deployforge-api-jeuo.onrender.com> | Render (Docker) |
+| Liveness probe | [`/api/v1/health/live`](https://deployforge-api-jeuo.onrender.com/api/v1/health/live) | |
+| Readiness probe (checks the database) | [`/api/v1/health/ready`](https://deployforge-api-jeuo.onrender.com/api/v1/health/ready) | |
+| Database | Supabase PostgreSQL (private; reached only by the API, over TLS) | Supabase |
 
-```
-backend/app/
-├── api/            HTTP layer: routers, dependencies (auth, pagination, request context)
-├── services/       Business logic: organizations, workspaces, authorization, audit
-├── models/         SQLAlchemy 2.x ORM models (UUID keys, timestamps, constraints)
-├── schemas/        Pydantic v2 request/response models
-├── core/           Settings, structured logging, error handling, token security
-├── db/             Engine/session management and declarative base
-└── scripts/        Development seed data
-frontend/src/
-├── api/            Typed endpoint functions and TanStack Query hooks
-├── components/     Design-system primitives (ui/) and app shell (layout/)
-├── features/       Feature components (create dialogs, roadmap placeholders)
-├── pages/          Route screens
-├── providers/      Auth, theme and active-organization context
-└── styles/         Tailwind v4 design tokens (light and dark)
-```
+**How the public demo works:**
 
-The full design notes, including the data model and authorization matrix, are in
-[docs/architecture.md](docs/architecture.md).
+- **Why read-only.** Phase 1 ships only development authentication, so the public site runs as
+  a read-only demo with synthetic data.
+- **What is live.** The *platform status* indicators are real calls from your browser to the
+  Render API, which checks Supabase.
+- **What the API allows.** Every business endpoint rejects anonymous requests with `401`.
+- **Cold starts.** The API runs on a free instance that sleeps when idle, so the first request
+  can take about a minute.
+
+---
+
+## Screenshots
+
+All screenshots are captured from the live public demo. Data shown is synthetic.
+
+| Enterprise overview (light) | Enterprise overview (dark) |
+| :---: | :---: |
+| ![Dashboard in light mode](docs/assets/screenshots/dashboard-light.png) | ![Dashboard in dark mode](docs/assets/screenshots/dashboard-dark.png) |
+
+| Workspaces | Workspace detail |
+| :---: | :---: |
+| ![Workspace list](docs/assets/screenshots/workspaces.png) | ![Workspace detail with statistics and access](docs/assets/screenshots/workspace-detail.png) |
+
+| Live platform monitoring | Roadmap placeholder (Agent Studio) | Narrow viewport (500 px) |
+| :---: | :---: | :---: |
+| ![Monitoring page with live API and database health](docs/assets/screenshots/monitoring.png) | ![Agent Studio roadmap page](docs/assets/screenshots/roadmap-agent-studio.png) | ![Dashboard on a narrow viewport](docs/assets/screenshots/mobile-dashboard.png) |
+
+---
 
 ## Technology stack
 
 | Layer | Technologies |
 | --- | --- |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, React Router, TanStack Query, Axios, Lucide React |
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2, PyJWT, psycopg 3 |
-| Database | PostgreSQL 17 |
-| Testing | Pytest (against real PostgreSQL), Vitest, React Testing Library, MSW |
-| Infrastructure | Docker, Docker Compose, nginx (unprivileged), GitHub Actions |
+| **Frontend** | React 19, TypeScript (strict), Vite, Tailwind CSS v4 (CSS-variable design tokens), React Router, TanStack Query, Axios, Lucide React |
+| **Backend** | Python 3.12, FastAPI, Pydantic v2 and pydantic-settings, SQLAlchemy 2.x, Alembic, psycopg 3, PyJWT, Uvicorn |
+| **Database** | PostgreSQL 17 locally; Supabase PostgreSQL (Supavisor session pooler, TLS) in production |
+| **Testing** | Pytest against real PostgreSQL, Vitest, React Testing Library, MSW, Ruff, ESLint |
+| **Infrastructure** | Docker (non-root images), Docker Compose, nginx (unprivileged), GitHub Actions, Vercel, Render, Supabase |
 
-## Quick start (Docker)
+---
+
+## System architecture
+
+### Deployment architecture
+
+```mermaid
+flowchart LR
+    user([Browser])
+
+    subgraph vercel["Vercel"]
+        spa["React SPA<br/>public demo build"]
+    end
+
+    subgraph render["Render"]
+        api["FastAPI container<br/>Uvicorn · PORT-aware"]
+    end
+
+    subgraph supabase["Supabase"]
+        pooler["Supavisor<br/>session pooler"]
+        pg[("PostgreSQL<br/>RLS enabled")]
+    end
+
+    subgraph github["GitHub"]
+        repo["Repository<br/>protected main"]
+        ci["GitHub Actions<br/>5 required checks"]
+    end
+
+    user -->|HTTPS| spa
+    user -->|"HTTPS + CORS<br/>/api/v1/health/*"| api
+    api -->|TLS| pooler --> pg
+    repo --> ci
+    repo -->|"main"| spa
+    ci -->|"checks pass"| api
+```
+
+### Local architecture (Docker Compose)
+
+```mermaid
+flowchart LR
+    browser([Browser]) -->|":8080"| nginx["nginx<br/>full console + /api proxy"]
+    nginx -->|"/api/*"| api["FastAPI<br/>:8000"]
+    api --> db[("PostgreSQL 17<br/>:5433")]
+    vite["Vite dev server<br/>:5173"] -.->|"/api proxy"| api
+```
+
+All local ports bind to `127.0.0.1`. In both environments the browser uses a single API base
+path, `/api/v1`. Locally it is proxied same-origin by nginx or Vite; in production it is called
+cross-origin with an explicit CORS allow-list.
+
+### Frontend architecture
+
+- **Data layer.** Typed endpoint functions and TanStack Query hooks
+  ([`src/api/`](frontend/src/api)). Axios errors are normalized into an `ApiError` that mirrors
+  the backend error envelope. Only network errors and `5xx` responses are retried.
+- **State and context.** Providers for identity, theme and the active organization
+  ([`src/providers/`](frontend/src/providers)).
+- **Design system.** Accessible primitives such as Button, Card, Badge, Dialog (native
+  `<dialog>`), form fields with ARIA wiring, Table, StatCard, and empty, error and loading
+  states ([`src/components/ui/`](frontend/src/components/ui)). All colors come from
+  light and dark CSS-variable tokens ([`src/styles/index.css`](frontend/src/styles/index.css)).
+- **Two builds from one codebase:**
+  - **Full console** (`npm run build`): development sign-in plus the live API.
+  - **Public demo** (`npm run build:demo`): built with the compile-time flag
+    `__DEMO_MODE__`, the same pages render synthetic data
+    ([`src/demo/`](frontend/src/demo)), and the sign-in and token code is removed from the
+    bundle.
+- **Build-time guards.** Production builds reject localhost, `http://`, or a malformed API URL.
+  A Content-Security-Policy is injected, scoped to the API origin.
+
+### Backend architecture
+
+A modular monolith with clear layers:
+
+```mermaid
+flowchart TB
+    req([HTTP request]) --> mw["Middleware<br/>CORS · request ID · security headers · access log"]
+    mw --> routes["API routers · /api/v1<br/>health · auth · organizations · workspaces"]
+    routes --> deps["Dependencies<br/>JWT auth · DB session · pagination · request context"]
+    deps --> services["Services<br/>authorization · organizations · workspaces · audit"]
+    services --> models["SQLAlchemy 2.x models"]
+    models --> db[("PostgreSQL")]
+    routes -.-> errors["Centralized exception handlers<br/>uniform error envelope"]
+```
+
+- **Configuration** ([`app/core/config.py`](backend/app/core/config.py)) is validated at
+  startup. In production the API refuses unsafe settings, and errors never echo secret values.
+- **Authorization** ([`app/services/authorization.py`](backend/app/services/authorization.py))
+  loads each resource together with the caller's membership in a single query.
+- **Audit events** are added to the same database session as the change, so both commit or
+  neither does.
+- **Logging** writes one JSON object per line to stdout, tagged with the request ID.
+
+### Database architecture
+
+```mermaid
+erDiagram
+    users ||--o{ organization_memberships : "belongs to"
+    organizations ||--o{ organization_memberships : has
+    organizations ||--o{ workspaces : owns
+    workspaces ||--o{ workspace_memberships : has
+    organization_memberships ||--o{ workspace_memberships : "scopes (org_id, user_id)"
+    organizations |o--o{ audit_logs : records
+    workspaces |o--o{ audit_logs : records
+    users |o--o{ audit_logs : "acts in"
+
+    users {
+        uuid id PK
+        string email UK "lowercase"
+        string full_name
+        bool is_active
+    }
+    organizations {
+        uuid id PK
+        string name
+        string slug UK
+    }
+    organization_memberships {
+        uuid organization_id FK
+        uuid user_id FK
+        enum role "owner | admin | member | viewer"
+    }
+    workspaces {
+        uuid id PK
+        uuid organization_id FK
+        string slug "unique per organization"
+        enum environment "development | staging | production"
+        enum status "active | archived"
+    }
+    workspace_memberships {
+        uuid workspace_id FK
+        uuid organization_id FK
+        uuid user_id FK
+        enum role "admin | editor | viewer"
+    }
+    audit_logs {
+        uuid id PK
+        string action
+        jsonb details
+        string request_id
+        timestamptz created_at
+    }
+```
+
+- Every table has UUID primary keys and `timestamptz` timestamps set by the database.
+  Constraints and indexes are named deterministically.
+- **Composite foreign keys** on `workspace_memberships` make it impossible for the database to
+  store a membership in another tenant's workspace, or for a non-member of the organization.
+- Audit rows keep their history when the actor or resource is deleted (`ON DELETE SET NULL`).
+- **Row-level security** (migration `0002`) denies all rows to non-owner roles, such as the
+  roles behind Supabase's public REST API. The API connects as the table owner.
+
+Full design notes, including the authorization matrix: [docs/architecture.md](docs/architecture.md).
+
+---
+
+## Getting started
+
+### Option A: Docker Compose (recommended)
 
 Prerequisites: Docker with Compose v2.
 
 ```bash
-cp .env.example .env          # local-development placeholders; edit if you like
+git clone https://github.com/shiva-sripelly/DeployForge-AI.git
+cd DeployForge-AI
+cp .env.example .env          # local-development placeholders only
 docker compose up -d --build
 ```
 
@@ -100,11 +280,12 @@ docker compose up -d --build
 | --- | --- |
 | Web console | http://localhost:8080 |
 | API | http://localhost:8000/api/v1 |
-| API docs (OpenAPI) | http://localhost:8000/api/docs (disabled when `ENVIRONMENT=production`) |
+| Interactive API docs (OpenAPI) | http://localhost:8000/api/docs (disabled in production) |
 | PostgreSQL | `127.0.0.1:5433` (user/db `deployforge`) |
 
-On startup the backend applies migrations automatically. With `SEED_DEV_DATA=true` (the default
-in `.env.example`) it also creates a sample tenant and three accounts:
+On startup the backend validates configuration and applies migrations. With
+`SEED_DEV_DATA=true` (the default in `.env.example`) it also creates a sample tenant and three
+development accounts:
 
 | Account | Access |
 | --- | --- |
@@ -112,26 +293,19 @@ in `.env.example`) it also creates a sample tenant and three accounts:
 | `engineer@deployforge.dev` | Member of *Northwind Health*, editor of one workspace only |
 | `outsider@deployforge.dev` | No memberships: demonstrates tenant isolation |
 
-Sign in on the console with one of these addresses. These accounts have no passwords. They
-can only obtain tokens through the development token endpoint, which the API refuses to enable
-in production.
-
-Common commands:
+These accounts have no passwords. They can obtain tokens only through the development token
+endpoint, which is local-only and refused by the API in production.
 
 ```bash
 docker compose ps                         # service status and health
 docker compose logs -f backend            # structured JSON logs
 docker compose exec backend alembic current
-docker compose down                       # stop (data is kept in the postgres_data volume)
-docker compose down -v                    # stop and delete the database volume
+docker compose down                       # stop (data persists in the postgres_data volume)
 ```
 
-All published ports bind to `127.0.0.1`, so the stack is not reachable from other machines.
+### Option B: Run the services directly
 
-## Local development without Docker
-
-Run PostgreSQL however you prefer. The simplest option is the Compose database only:
-`docker compose up -d db`.
+Start PostgreSQL first (for example, `docker compose up -d db`).
 
 **Backend** (Python 3.12+):
 
@@ -142,216 +316,280 @@ source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 cp .env.example .env
 alembic upgrade head
-python -m app.scripts.seed_dev         # optional demo data
+python -m app.scripts.seed_dev         # optional development data
 uvicorn --factory app.main:create_app --reload --port 8000
 ```
 
-**Frontend** (Node 22+):
+**Frontend** (Node.js 22.12+):
 
 ```bash
 cd frontend
 npm ci
-npm run dev                            # http://localhost:5173
+npm run dev                            # http://localhost:5173 (proxies /api to :8000)
 ```
 
-The Vite dev server proxies `/api` to `http://127.0.0.1:8000`, so no CORS setup is needed.
+> Use `127.0.0.1` rather than `localhost` in local database URLs. On some systems
+> `localhost` resolves to IPv6 first and stalls, because Docker publishes the port on IPv4 only.
 
-> Use `127.0.0.1` rather than `localhost` in local database URLs. On some systems `localhost`
-> resolves to IPv6 first and stalls, because Docker publishes the port on IPv4 only.
-
-## Configuration
-
-All configuration comes from environment variables, validated at startup by
-[`app/core/config.py`](backend/app/core/config.py).
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ENVIRONMENT` | `development` | `development`, `test`, `staging` or `production` |
-| `DATABASE_URL` | *required* | SQLAlchemy URL, e.g. `postgresql+psycopg://user:pass@host:5432/db` |
-| `JWT_SECRET_KEY` | *required* | HMAC signing key, at least 32 characters (48+ and non-placeholder in production) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime (5–1440) |
-| `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed browser origins |
-| `DEV_AUTH_ENABLED` | `false` | Mounts `POST /api/v1/auth/dev/token`; **rejected in production** |
-| `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Logging verbosity; `json` or human-readable `console` |
-| `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` | `5` / `10` | Connection pool sizing |
-| `DATABASE_SSL_MODE` | *unset* | libpq `sslmode`; production requires `require`, `verify-ca` or `verify-full` |
-| `DATABASE_SSL_ROOT_CERT` | *unset* | CA bundle path for `verify-ca` / `verify-full` |
-| `DATABASE_DISABLE_PREPARED_STATEMENTS` | `false` | Set `true` behind transaction-mode poolers (e.g. Supabase port 6543) |
-| `DATABASE_POOL_RECYCLE_SECONDS` / `DATABASE_CONNECT_TIMEOUT_SECONDS` | `1800` / `10` | Connection recycling and connect timeout |
-| `PORT` | `8000` | Port the container listens on (Render injects it) |
-
-Compose-only variables (`POSTGRES_*`, `SEED_DEV_DATA`, `*_HOST_PORT`) are documented in
-[`.env.example`](.env.example). Frontend build variables are in
-[`frontend/.env.example`](frontend/.env.example). Anything prefixed `VITE_` ends up in the
-browser bundle, so it must never contain secrets.
-
-When `ENVIRONMENT=production` the API **refuses to start** if `JWT_SECRET_KEY` or
-`DATABASE_URL` is missing, development auth is on, the JWT key is short or looks like a
-placeholder, `CORS_ORIGINS` is empty or contains anything other than explicit non-local
-`https://` origins, the database connection is not TLS-encrypted, or SQL echo is enabled.
-Configuration errors name the offending variable but never echo its value. OpenAPI docs are
-disabled in production. Plain `postgresql://` URLs (as copied from Supabase) are accepted and
-mapped to the installed psycopg 3 driver.
-
-## Database migrations
-
-Migrations live in [`backend/alembic/versions`](backend/alembic/versions). The database URL is
-read from `DATABASE_URL`, never from `alembic.ini`.
+### Database migrations
 
 ```bash
 cd backend
 alembic upgrade head                                  # apply all migrations
-alembic downgrade -1                                  # roll back one revision
 alembic current                                       # show the applied revision
-alembic revision --autogenerate -m "describe change"  # generate after editing models
+alembic revision --autogenerate -m "describe change"  # generate after editing models (then review)
 ```
 
-Migration `0002` enables row-level security (deny by default) on every table, so hosted
-providers' auto-generated REST APIs (for example Supabase's, which uses public keys) cannot read
-any rows. The API connects as the table owner and is unaffected. New tables must enable RLS
-too; `test_every_table_has_row_level_security_enabled_but_not_forced` enforces this.
+CI fails if the models and migrations drift apart, and it checks that a full downgrade and
+upgrade round trip works. New tables must enable row-level security, which a test enforces.
 
-Always review autogenerated migrations. The test suite fails if the models and migrations
-drift apart (`test_models_match_migrations`), and it checks that a full downgrade and upgrade
-round-trip works.
+---
 
-## Testing
+## Environment variables
 
-**Backend:** 142 tests that run against a real PostgreSQL database. The schema is built by
-running the Alembic migrations, and each test runs inside a rolled-back transaction.
+Configuration comes entirely from environment variables. **No secrets are committed.** The
+`.env.example` files contain local placeholders only, and production secrets are entered in the
+hosting dashboards.
 
-```bash
-docker compose up -d db                 # or point TEST_DATABASE_URL at any PostgreSQL
-cd backend
-pytest                                  # creates the deployforge_test database if missing
-pytest --cov=app                        # with coverage
-ruff check . && ruff format --check .
-```
+### Backend
 
-The suite covers health and readiness (including database outage), database connectivity,
-migration integrity, model constraints and tenant-isolation foreign keys, request validation,
-authentication (expired, forged, unsigned, wrong audience, inactive user), the role- and
-tenant-based authorization boundaries, the error envelope, production-config safety, hosted
-PostgreSQL connection options (TLS, poolers), row-level security, and the production
-authentication boundary.
+| Variable | Required | Default | Description |
+| --- | :-: | --- | --- |
+| `ENVIRONMENT` | | `development` | `development`, `test`, `staging` or `production` |
+| `DATABASE_URL` | ✅ | — | PostgreSQL URL. `postgresql://` is accepted and mapped to psycopg 3. |
+| `JWT_SECRET_KEY` | ✅ | — | Token signing key: 32+ characters, or 48+ random characters in production |
+| `CORS_ORIGINS` | | `http://localhost:5173` | Comma-separated allowed origins. Production accepts only explicit `https://` origins. |
+| `DEV_AUTH_ENABLED` | | `false` | Enables the development token endpoint. Rejected in production. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | | `60` | Access token lifetime (5–1440) |
+| `DATABASE_SSL_MODE` | prod | — | libpq `sslmode`. Production requires `require`, `verify-ca` or `verify-full`. |
+| `DATABASE_SSL_ROOT_CERT` | | — | CA certificate path for `verify-ca` / `verify-full` |
+| `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` | | `5` / `10` | Connection pool sizing |
+| `DATABASE_POOL_RECYCLE_SECONDS` / `DATABASE_CONNECT_TIMEOUT_SECONDS` | | `1800` / `10` | Connection recycling and connect timeout |
+| `DATABASE_DISABLE_PREPARED_STATEMENTS` | | `false` | Set `true` behind transaction-mode poolers |
+| `LOG_LEVEL` / `LOG_FORMAT` | | `INFO` / `json` | Log verbosity; `json` or `console` |
+| `PORT` | | `8000` | Container listening port (injected by Render) |
+| `RUN_MIGRATIONS` / `SEED_DEV_DATA` | | `true` / `false` | Container start-up behavior. Seeding refuses to run in production. |
 
-**Frontend:** 54 tests using Vitest, React Testing Library and MSW (mocked HTTP at the network
-layer), split into two projects: `full` (the console with sign-in) and `demo` (compiled as the
-public read-only demo).
+### Frontend (build time)
 
-```bash
-cd frontend
-npm test            # rendering, navigation, auth flow, dashboard data, create flows, error handling
-npm run lint
-npm run typecheck
-npm run build && npm run check:bundle
-VITE_API_BASE_URL=https://api.example.com/api/v1 npm run build:demo && npm run check:bundle -- --public
-```
-
-**CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs five jobs on every pull
-request and on `main`:
-
-| Job | What it checks |
+| Variable | Description |
 | --- | --- |
-| Security configuration | No committed env files or credential-like strings; safe Render, Vercel and Compose settings ([script](scripts/ci/check_security_config.py)) |
-| Backend | Ruff lint and format, migrations on a fresh database, seed idempotency, pytest with coverage |
-| Frontend | ESLint, TypeScript, both test projects, both production builds, and bundle checks proving the public build has no development sign-in code |
-| Backend container | The real Docker image refuses unsafe production config, binds Render's `PORT`, and rejects anonymous access ([script](scripts/ci/container_smoke_test.sh)) |
-| Docker Compose | Both local images build |
+| `VITE_API_BASE_URL` | API base URL as seen by the browser: `/api/v1` locally, `https://<api-host>/api/v1` for the public demo. Compiled into the bundle, so it is **public**. |
+| `VITE_APP_MODE` | `full` (default) or `demo`. Set by [`frontend/.env.demo`](frontend/.env.demo) for the public build. |
 
-## Cloud deployment and public demo
+Compose-only variables (`POSTGRES_*`, `*_HOST_PORT`) are documented in
+[`.env.example`](.env.example). The full production reference is in the
+[deployment guide](docs/deployment/CLOUD_DEPLOYMENT.md#5-environment-variable-reference).
 
-The public deployment uses **Vercel** (frontend), **Render** (API) and **Supabase**
-(PostgreSQL), all on free tiers. The step-by-step guide, environment variable reference,
-verification checklist, troubleshooting and rollback procedures are in
-[docs/deployment/CLOUD_DEPLOYMENT.md](docs/deployment/CLOUD_DEPLOYMENT.md).
+---
 
-Because Phase 1 has only development authentication, the public site is a **read-only demo**:
+## API documentation
 
-- `npm run build:demo` compiles the console with `__DEMO_MODE__`. It renders the same pages
-  with **synthetic data bundled in the browser** and never calls a protected endpoint. Only the
-  public health endpoints are live, which shows real Render and Supabase connectivity.
-- The development sign-in page, seeded account list and token handling are **compiled out** of
-  that bundle; `npm run check:bundle -- --public` fails the build if they reappear.
-- **The backend is the security boundary, not the frontend.** In production, dev token issuance
-  is refused by configuration, so no token can be obtained and every protected endpoint
-  returns 401 to the public.
-- [`render.yaml`](render.yaml) and [`frontend/vercel.json`](frontend/vercel.json) hold the
-  platform configuration; secrets are entered in the platform dashboards, never committed.
+Interactive OpenAPI documentation is served at `/api/docs` in non-production environments.
+It is intentionally disabled in production.
 
-## API reference
-
-Interactive documentation is served at `/api/docs` outside production. Phase 1 endpoints:
-
-| Method | Path | Access |
+| Method | Endpoint | Access |
 | --- | --- | --- |
 | `GET` | `/api/v1/health/live` | Public: process liveness |
-| `GET` | `/api/v1/health/ready` | Public: database readiness (503 when not ready) |
-| `POST` | `/api/v1/auth/dev/token` | Development only: token for an existing active account |
+| `GET` | `/api/v1/health/ready` | Public: database readiness (`503` when not ready) |
+| `POST` | `/api/v1/auth/dev/token` | Development only: token for an existing, active account (absent in production) |
 | `GET` | `/api/v1/auth/me` | Authenticated |
-| `POST` | `/api/v1/organizations` | Authenticated; caller becomes owner |
+| `POST` | `/api/v1/organizations` | Authenticated; the caller becomes owner |
 | `GET` | `/api/v1/organizations` | Authenticated; only organizations the caller belongs to |
 | `GET` | `/api/v1/organizations/{id}` | Organization member |
 | `GET` | `/api/v1/organizations/{id}/stats` | Organization member |
 | `GET` | `/api/v1/organizations/{id}/audit-logs` | Organization owner or admin |
 | `POST` | `/api/v1/organizations/{id}/workspaces` | Organization owner or admin |
 | `GET` | `/api/v1/organizations/{id}/workspaces` | Owners and admins see all workspaces; others see their own |
-| `GET` | `/api/v1/workspaces/{id}` | Organization owner/admin or workspace member |
-| `GET` | `/api/v1/workspaces/{id}/stats` | Organization owner/admin or workspace member |
+| `GET` | `/api/v1/workspaces/{id}` | Organization owner/admin, or workspace member |
+| `GET` | `/api/v1/workspaces/{id}/stats` | Organization owner/admin, or workspace member |
 
-List endpoints accept `limit` (1–100) and `offset`. Errors always use this shape:
+List endpoints accept `limit` (1–100) and `offset`. Every response includes an `X-Request-ID`
+header. Errors use one envelope:
 
 ```json
 { "error": { "code": "permission_denied", "message": "...", "details": null, "request_id": "..." } }
 ```
 
-## Security model
+Example against the live API:
 
-- **No anonymous access to tenant data.** Every organization and workspace endpoint requires a
-  valid JWT. The token's signature, expiry, issuer and audience are all verified, and the user
-  must exist and be active.
-- **Tenant isolation at two levels.** The API returns 404 for any resource outside the caller's
-  tenants, so other tenants' IDs cannot be probed. In the database, composite foreign keys
-  ensure that a workspace membership always refers to a workspace in the same organization and
-  to a user who is a member of that organization.
-- **Audit trail.** Audited actions are written in the same transaction as the change. Audit rows
-  survive deletion of the actor or resource (`ON DELETE SET NULL`).
-- **Development auth is fenced off.** It is disabled by default, refused in production,
-  mounted only when enabled, never creates accounts, and is reachable only on loopback in the
-  Compose stack.
-- **Hosted database hardening.** Production requires TLS to PostgreSQL (`verify-full`
-  supported) and every table has row-level security enabled, so a provider's REST API with
-  public keys cannot read data.
-- **Hardened defaults.** Containers run as non-root. nginx sends a strict CSP and security
-  headers. The API sets `nosniff`, `DENY` framing and `no-store` caching, and returns a generic
-  500 response without internal details. Access tokens are kept in `sessionStorage`, so they
-  are scoped to one browser tab.
+```bash
+curl https://deployforge-api-jeuo.onrender.com/api/v1/health/ready
+# {"status":"ready","version":"0.1.0","environment":"production","checks":{"database":{"status":"ok",...}}}
 
-## Known limitations
+curl -i https://deployforge-api-jeuo.onrender.com/api/v1/organizations
+# HTTP/1.1 401 Unauthorized
+```
 
-- **Authentication is development-grade.** There are no passwords, SSO or MFA yet: tokens come
-  from the dev endpoint for seeded accounts. Phase 2 adds OIDC/SAML SSO and token revocation.
-- **Membership management is not exposed.** There are no APIs for inviting members, changing
-  roles, archiving workspaces or deleting organizations. Memberships are created at org or
-  workspace creation and by the seed script.
-- **Access tokens are stateless and cannot be revoked** before they expire (60 minutes by
+---
+
+## Security
+
+### Application security
+
+- **Authentication.** JWT signature, expiry, issuer and audience are verified, and only the
+  configured algorithm is accepted (unsigned `alg=none` tokens are rejected). The user must
+  exist and be active.
+- **Authorization.**
+  - Role checks run in the service layer.
+  - Resources outside the caller's tenants return `404` to prevent enumeration.
+  - A `403` response lists the roles that would be required.
+- **Input validation.** Pydantic v2 schemas reject unknown fields. Slugs, lengths, enums and
+  pagination bounds are enforced.
+- **Error handling.** The API returns a generic `500` with no internal details. Configuration
+  errors name the variable but never echo its value.
+- **Headers.** The API sets `nosniff`, `X-Frame-Options: DENY` and `Cache-Control: no-store`.
+  The frontend serves a strict Content-Security-Policy.
+
+### Deployment security
+
+- **Fail-safe production configuration.** The API refuses to start if any of these hold:
+  - `JWT_SECRET_KEY` or `DATABASE_URL` is missing, or the key is weak or a placeholder.
+  - Development auth is enabled.
+  - `CORS_ORIGINS` contains `*`, `http://` or localhost origins.
+  - The database connection is not TLS-encrypted.
+- **No authentication bypass in production.** The development token endpoint is not mounted,
+  so no token can be issued and every protected endpoint returns `401`.
+- **Public demo boundary.**
+  - The demo bundle contains no sign-in code, seeded accounts or token handling, and a CI bundle
+    scan enforces this.
+  - The demo never calls protected endpoints.
+  - The backend enforces access regardless of the frontend.
+- **Database.**
+  - TLS is required in production (`verify-full` supported).
+  - Row-level security is enabled on every table.
+  - Credentials live only in Render's environment, never in the frontend or the repository.
+- **Containers.** Images run as non-root users with minimal runtime layers. Local ports bind
+  to loopback only.
+
+### CI/CD security gates
+
+Every pull request and every push to `main` runs [five jobs](.github/workflows/ci.yml):
+
+| Job | What it checks |
+| --- | --- |
+| **Security configuration** | No committed env files or credential-like strings; safe Render, Vercel and Compose settings ([script](scripts/ci/check_security_config.py)) |
+| **Backend** | Ruff lint and format, migrations on a fresh database, seed idempotency, pytest with coverage against PostgreSQL |
+| **Frontend** | ESLint, TypeScript, the full-console and demo test suites, both production builds, public-bundle scan |
+| **Backend container** | The real image refuses unsafe production config, binds `PORT`, and rejects anonymous access ([script](scripts/ci/container_smoke_test.sh)) |
+| **Docker Compose** | Local images build |
+
+Render is configured to deploy `main` only after these checks pass, and Vercel builds production only from
+`main`. Setup, verification, troubleshooting and rollback procedures are in
+[docs/deployment/CLOUD_DEPLOYMENT.md](docs/deployment/CLOUD_DEPLOYMENT.md).
+
+---
+
+## Testing
+
+The backend suite runs against a **real PostgreSQL database**. The schema is built by the
+Alembic migrations, and each test runs in a rolled-back transaction.
+
+```bash
+docker compose up -d db
+cd backend
+pytest --cov=app
+ruff check . && ruff format --check .
+```
+
+Coverage areas:
+
+- Health and readiness, including a database outage
+- Migration integrity, model constraints and tenant-isolation foreign keys
+- Request validation
+- Authentication edge cases: expired, forged, unsigned and wrong-audience tokens, and inactive
+  users
+- Role- and tenant-based authorization boundaries
+- Production-configuration safety, TLS and connection-pooler options, and row-level security
+
+The frontend uses Vitest, React Testing Library and MSW, with two test projects: `full` (the
+console with sign-in) and `demo` (compiled as the public build).
+
+```bash
+cd frontend
+npm test
+npm run lint && npm run typecheck
+npm run build && npm run check:bundle
+```
+
+---
+
+## Project structure
+
+```
+DeployForge-AI/
+├── backend/
+│   ├── app/
+│   │   ├── api/              # Routers (/api/v1) and dependencies: auth, DB session, pagination
+│   │   ├── core/             # Settings validation, JSON logging, exceptions, JWT security
+│   │   ├── db/               # Engine, sessions, TLS/pool options, declarative base
+│   │   ├── models/           # SQLAlchemy models: users, organizations, workspaces, memberships, audit logs
+│   │   ├── schemas/          # Pydantic request/response models
+│   │   ├── services/         # Business logic: authorization, organizations, workspaces, audit
+│   │   ├── scripts/          # Development seed data (refuses to run in production)
+│   │   ├── middleware.py     # Request IDs, security headers, access logging
+│   │   └── main.py           # FastAPI application factory
+│   ├── alembic/versions/     # 0001 initial schema · 0002 row-level security
+│   ├── tests/                # Pytest suite (real PostgreSQL)
+│   ├── Dockerfile            # Multi-stage, non-root, PORT-aware image
+│   └── docker-entrypoint.sh  # Validate config → migrate → (seed) → serve
+├── frontend/
+│   ├── src/
+│   │   ├── api/              # Typed endpoints and TanStack Query hooks
+│   │   ├── components/       # Design system (ui/) and app shell (layout/)
+│   │   ├── demo/             # Public demo: synthetic data, read-only adapter, demo identity
+│   │   ├── features/         # Create dialogs, roadmap placeholders
+│   │   ├── pages/            # Route screens
+│   │   ├── providers/        # Auth, theme, active organization
+│   │   └── styles/           # Tailwind v4 design tokens (light/dark)
+│   ├── config/               # Build-time API URL and CSP checks
+│   ├── scripts/              # Production bundle scanner
+│   ├── vercel.json           # SPA fallback, security headers, demo build command
+│   └── Dockerfile, nginx.conf
+├── docs/
+│   ├── architecture.md
+│   ├── deployment/CLOUD_DEPLOYMENT.md
+│   └── assets/screenshots/
+├── scripts/ci/               # Security-config check, container smoke test
+├── .github/workflows/ci.yml  # Five-job CI pipeline
+├── docker-compose.yml        # Local stack (loopback-only ports)
+└── render.yaml               # Render Blueprint (secrets via dashboard)
+```
+
+---
+
+## Development roadmap
+
+| Phase | Status | Theme | Scope |
+| --- | :-: | --- | --- |
+| **1 · Foundation** | ✅ Complete | Platform core | Multi-tenant organizations and workspaces, RBAC, audit trail, versioned API, enterprise console, Docker, CI |
+| **1.5 · Cloud deployment** | ✅ Complete | Ship publicly | Vercel, Render and Supabase deployment, read-only public demo, TLS and RLS hardening, security-gated CI/CD |
+| **2 · Identity & access** | Planned | Enterprise auth | OIDC/SAML SSO, invitations, role management UI, API keys, token revocation, tenant-scoped RLS policies |
+| **3 · Requirements intelligence** | Planned | AI Solution Architect | Requirement capture, generated reference architectures, risk and compliance checklists, human approval |
+| **4 · Integrations & workflows** | Planned | Connect and orchestrate | Connector catalog, external secrets management, versioned workflows with approval steps |
+| **5 · Agents & evaluation** | Planned | AI Agent Studio | Least-privilege agent tools, evaluation suites, prompt and model versioning |
+| **6 · Delivery & operations** | Planned | Ship and run | Environment promotion, rollbacks, solution telemetry, incident management |
+
+### Known limitations
+
+- **Development-grade authentication.** There are no passwords, SSO or MFA yet. Locally, tokens
+  come from the dev endpoint for seeded accounts; production has no sign-in until Phase 2.
+- **No membership management API.** Inviting members, changing roles, archiving workspaces and
+  deleting organizations are not exposed yet.
+- **Stateless tokens.** Access tokens cannot be revoked before they expire (60 minutes by
   default).
-- **The audit log is append-only by convention.** The application never updates or deletes
-  audit rows, but database-level immutability (grants or triggers) is not yet enforced.
-- **No rate limiting** on the API. Locally the dev token endpoint is mitigated by loopback-only
-  binding; in production it does not exist. Public endpoints are limited to health checks.
-- **Free-tier hosting.** The Render free instance sleeps after inactivity (the first request
-  can take about a minute), and Supabase pauses inactive free projects.
-- **Synchronous database access.** FastAPI runs the sync SQLAlchemy endpoints in a threadpool.
-  This is adequate for Phase 1 load and can move to async if profiling warrants it.
+- **Audit log immutability.** The log is append-only by convention; the database does not yet
+  enforce it.
+- **No API rate limiting.** In production, the only public endpoints are the health checks.
+- **Free-tier hosting.** The API sleeps after inactivity, and Supabase pauses inactive free
+  projects.
 
-## Roadmap
+---
 
-| Phase | Theme | Highlights |
-| --- | --- | --- |
-| **1 · Foundation** ✅ | Platform core | Tenancy, workspaces, authorization, audit trail, console, CI |
-| **2 · Identity & access** | Enterprise auth | OIDC/SAML SSO, invitations, role management UI, API keys, token revocation, PostgreSQL row-level security |
-| **3 · Requirements intelligence** | AI Solution Architect | Requirement capture, generated reference architectures, risk and compliance checklists, human approval |
-| **4 · Integrations & workflows** | Connect and orchestrate | Connector catalog, external secrets management, versioned workflows with approval steps |
-| **5 · Agents & evaluation** | AI Agent Studio | Least-privilege agent tools, evaluation suites, prompt/model versioning |
-| **6 · Delivery & operations** | Ship and run | Environment promotion, rollbacks, solution telemetry, incident management |
+<div align="center">
+
+Built with FastAPI, React and PostgreSQL ·
+[Live demo](https://deploy-forge-ai.vercel.app) ·
+[Report an issue](https://github.com/shiva-sripelly/DeployForge-AI/issues)
+
+</div>
