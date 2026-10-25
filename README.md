@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # DeployForge AI
 
 DeployForge AI is an enterprise platform that helps forward-deployed engineers turn customer
@@ -302,3 +303,7 @@ List endpoints accept `limit` (1–100) and `offset`. Errors always use this sha
 | **4 · Integrations & workflows** | Connect and orchestrate | Connector catalog, external secrets management, versioned workflows with approval steps |
 | **5 · Agents & evaluation** | AI Agent Studio | Least-privilege agent tools, evaluation suites, prompt/model versioning |
 | **6 · Delivery & operations** | Ship and run | Environment promotion, rollbacks, solution telemetry, incident management |
+=======
+# DeployForge-AI
+Enterprise AI-powered Forward Deployment Platform for intelligent solution architecture, multi-tenant SaaS, AI agents, workflow automation, system integrations, and production operations.
+>>>>>>> origin/main
